@@ -4,6 +4,7 @@
 #include <string.h>
 #include "ast.h"
 #include "semantic.h"
+#include "ir.h"
 
 int yylex(void);
 int yyerror(const char* str);
@@ -220,6 +221,11 @@ int main()
         enter_scope();
         analyzeAST(root);
         checkMainValidity();
+        initIR("output.txt");
+        generate3AC(root);
+        closeIR();
+
+        printf("3AC was written to output.txt\n");
     }
     return 0;
 }
