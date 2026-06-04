@@ -1,0 +1,9 @@
+compiler
+lex.yy.c
+y.tab.c
+y.tab.h
+parser.tab.c
+parser.tab.h
+*.o
+output.txt
+input.txt
