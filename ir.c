@@ -7,6 +7,12 @@ static FILE* ir_output = NULL;
 static int temp_counter = 0;
 static int label_counter = 1;
 
+static int isEmptyNode(node* tree);
+static void generateNode(node* tree);
+static void generateFunction(node* tree);
+static void generateProcedure(node* tree);
+static void generateBody(node* tree);
+
 void initIR(const char* outputFileName)
 {
     ir_output = fopen(outputFileName, "w");
@@ -115,5 +121,110 @@ void generate3AC(node* root)
         return;
     }
 
-    emitLine("# 3AC generation started");
+    generateNode(root);
+}
+
+static int isEmptyNode(node* tree)
+{
+    return tree != NULL && strcmp(tree->token, "") == 0;
+}
+
+static void generateNode(node* tree)
+{
+    if (tree == NULL)
+    {
+        return;
+    }
+
+    if (strcmp(tree->token, "CODE") == 0)
+    {
+        generateNode(tree->left);
+        return;
+    }
+
+    if (isEmptyNode(tree))
+    {
+        generateNode(tree->left);
+        generateNode(tree->right);
+        return;
+    }
+
+    if (strcmp(tree->token, "FUNC") == 0)
+    {
+        generateFunction(tree);
+        return;
+    }
+
+    if (strcmp(tree->token, "PROC") == 0)
+    {
+        generateProcedure(tree);
+        return;
+    }
+}
+
+static void generateFunction(node* tree)
+{
+    node* nameNode;
+    node* bodyNode;
+
+    if (tree == NULL)
+    {
+        return;
+    }
+
+    nameNode = tree->left;
+    bodyNode = tree->right->right->right;
+
+    emitFunctionHeader(nameNode->token);
+    emitBeginFunc(0);
+
+    generateBody(bodyNode);
+
+    emitEndFunc();
+    emitLine("");
+}
+
+static void generateProcedure(node* tree)
+{
+    node* nameNode;
+    node* bodyNode;
+
+    if (tree == NULL)
+    {
+        return;
+    }
+
+    nameNode = tree->left;
+    bodyNode = tree->right->right;
+
+    if (strcmp(nameNode->token, "Main") == 0)
+    {
+        emitFunctionHeader("main");
+    }
+    else
+    {
+        emitFunctionHeader(nameNode->token);
+    }
+
+    emitBeginFunc(0);
+
+    generateBody(bodyNode);
+
+    emitEndFunc();
+    emitLine("");
+}
+
+static void generateBody(node* tree)
+{
+    if (tree == NULL)
+    {
+        return;
+    }
+
+    if (strcmp(tree->token, "BODY") != 0)
+    {
+        return;
+    }
+
+    /* statements here */
 }
