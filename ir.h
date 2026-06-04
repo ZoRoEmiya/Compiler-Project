@@ -10,7 +10,11 @@ void closeIR();
 char* newTemp();
 char* newLabel();
 
-void emit(const char* format, ...);
+void emitLine(const char* line);
+void emitLabel(const char* label);
+void emitFunctionHeader(const char* name);
+void emitBeginFunc(int size);
+void emitEndFunc();
 
 void generate3AC(node* root);
 

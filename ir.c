@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdarg.h>
 #include "ir.h"
 
 static FILE* ir_output = NULL;
@@ -59,19 +58,54 @@ char* newLabel()
     return label;
 }
 
-void emit(const char* format, ...)
+void emitLine(const char* line)
 {
-    va_list args;
+    if (ir_output == NULL || line == NULL)
+    {
+        return;
+    }
 
+    fprintf(ir_output, "%s\n", line);
+}
+
+void emitLabel(const char* label)
+{
+    if (ir_output == NULL || label == NULL)
+    {
+        return;
+    }
+
+    fprintf(ir_output, "%s:\n", label);
+}
+
+void emitFunctionHeader(const char* name)
+{
+    if (ir_output == NULL || name == NULL)
+    {
+        return;
+    }
+
+    fprintf(ir_output, "%s:\n", name);
+}
+
+void emitBeginFunc(int size)
+{
     if (ir_output == NULL)
     {
         return;
     }
 
-    va_start(args, format);
-    vfprintf(ir_output, format, args);
-    fprintf(ir_output, "\n");
-    va_end(args);
+    fprintf(ir_output, "BeginFunc %d\n", size);
+}
+
+void emitEndFunc()
+{
+    if (ir_output == NULL)
+    {
+        return;
+    }
+
+    fprintf(ir_output, "EndFunc\n");
 }
 
 void generate3AC(node* root)
@@ -81,5 +115,5 @@ void generate3AC(node* root)
         return;
     }
 
-    emit("# 3AC generation started");
+    emitLine("# 3AC generation started");
 }
