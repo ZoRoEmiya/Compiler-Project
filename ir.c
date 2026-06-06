@@ -30,6 +30,8 @@ static void generateIfElse(node* tree);
 
 static void generateWhile(node* tree);
 
+static void generateFor(node* tree);
+
 static void emitAssign(const char* left, const char* right);
 static void emitBinary(const char* result, const char* left, const char* op, const char* right);
 static void emitUnary(const char* result, const char* op, const char* value);
@@ -485,6 +487,11 @@ static void generateStatement(node* tree)
         generateWhile(tree);
         return;
     }
+    if (strcmp(tree->token, "FOR") == 0)
+    {
+        generateFor(tree);
+        return;
+    }
     if (strcmp(tree->token, "BODY") == 0)
     {
         generateBody(tree);
@@ -760,6 +767,49 @@ static void generateWhile(node* tree)
 
     emitLabel(bodyLabel);
     generateStatement(tree->right);
+    emitGoto(startLabel);
+
+    emitLabel(endLabel);
+}
+
+static void generateFor(node* tree)
+{
+    node* initNode;
+    node* conditionNode;
+    node* updateNode;
+    node* bodyNode;
+
+    char* startLabel;
+    char* bodyLabel;
+    char* endLabel;
+    char* conditionPlace;
+
+    if (tree == NULL)
+    {
+        return;
+    }
+
+    initNode = tree->left;
+    conditionNode = tree->right->left;
+    updateNode = tree->right->right->left;
+    bodyNode = tree->right->right->right;
+
+    generateAssignment(initNode);
+
+    startLabel = newLabel();
+    bodyLabel = newLabel();
+    endLabel = newLabel();
+
+    emitLabel(startLabel);
+
+    conditionPlace = generateExpression(conditionNode);
+
+    emitIfGoto(conditionPlace, bodyLabel);
+    emitGoto(endLabel);
+
+    emitLabel(bodyLabel);
+    generateStatement(bodyNode);
+    generateAssignment(updateNode);
     emitGoto(startLabel);
 
     emitLabel(endLabel);
