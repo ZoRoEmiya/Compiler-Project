@@ -8,6 +8,9 @@ scope* current_scope = NULL;
 int next_scope_id = 0;
 char* current_func_return_type = NULL;
 int main_found = 0;
+int semantic_error_found = 0;
+
+#define SEMANTIC_ERROR(...) do { semantic_error_found = 1; printf(__VA_ARGS__); } while (0)
 
 int isLiteral(char* token) {
     if (!token) return 0;
@@ -94,7 +97,7 @@ void insertIdList(node* ids, char* type) {
         return;
     }
     if (lookup_current(ids->token) != NULL) {
-        printf("Semantic Error: Redeclaration of variable '%s' in the same scope\n", ids->token);
+        SEMANTIC_ERROR("Semantic Error: Redeclaration of variable '%s' in the same scope\n", ids->token);
         return;
     }
     insert_symbol(ids->token, "var", type);
@@ -163,7 +166,7 @@ char* evaluateType(node* tree) {
     if (strcmp(tree->token, "LEN") == 0) {
         char* innerType = evaluateType(tree->left);
         if (strcmp(innerType, "STRING") != 0) {
-            printf("Semantic Error: Length operator '| |' can only be applied to strings\n");
+            SEMANTIC_ERROR("Semantic Error: Length operator '| |' can only be applied to strings\n");
         }
         return "int";
     }
@@ -173,10 +176,10 @@ char* evaluateType(node* tree) {
         char* idxType = evaluateType(tree->right);
         
         if (strcmp(arrType, "STRING") != 0) {
-            printf("Semantic Error: Operator [] can only be used on strings\n");
+            SEMANTIC_ERROR("Semantic Error: Operator [] can only be used on strings\n");
         }
         if (strcmp(idxType, "int") != 0) {
-            printf("Semantic Error: String index must be of type int\n");
+            SEMANTIC_ERROR("Semantic Error: String index must be of type int\n");
         }
         return "char";
     }
@@ -185,7 +188,7 @@ char* evaluateType(node* tree) {
         symbol* s = lookup_all(tree->left->token);
         if (!s) return "unknown";
         if (strcmp(s->kind, "proc") == 0) {
-            printf("Semantic Error: Procedure '%s' does not return a value\n", s->name);
+            SEMANTIC_ERROR("Semantic Error: Procedure '%s' does not return a value\n", s->name);
             return "unknown";
         }
         return s->type;
@@ -194,7 +197,7 @@ char* evaluateType(node* tree) {
     if (strcmp(tree->token, "^") == 0) {
         char* ptrType = evaluateType(tree->left);
         if (!isPointerType(ptrType)) {
-            printf("Semantic Error: Dereference operator '^' can only be applied to pointers\n");
+            SEMANTIC_ERROR("Semantic Error: Dereference operator '^' can only be applied to pointers\n");
             return "unknown";
         }
         char* baseType = malloc(strlen(ptrType));
@@ -206,7 +209,7 @@ char* evaluateType(node* tree) {
     if (strcmp(tree->token, "&") == 0) {
         char* varType = evaluateType(tree->left);
         if (strcmp(varType, "int") != 0 && strcmp(varType, "real") != 0 && strcmp(varType, "char") != 0) {
-            printf("Semantic Error: Address operator '&' can only be applied to int, real, char, or string cells\n");
+            SEMANTIC_ERROR("Semantic Error: Address operator '&' can only be applied to int, real, char, or string cells\n");
             return "unknown";
         }
         char* ptrType = malloc(strlen(varType) + 2);
@@ -217,7 +220,7 @@ char* evaluateType(node* tree) {
     symbol* s = lookup_all(tree->token);
     if (s != NULL) {
         if (strcmp(s->kind, "func") == 0 || strcmp(s->kind, "proc") == 0) {
-            printf("Semantic Error: Cannot use function/procedure '%s' as a variable\n", s->name);
+            SEMANTIC_ERROR("Semantic Error: Cannot use function/procedure '%s' as a variable\n", s->name);
             return "unknown";
         }
         return s->type;
@@ -231,13 +234,13 @@ char* evaluateType(node* tree) {
             if ((strcmp(tree->token, "+") == 0 || strcmp(tree->token, "-") == 0) && strcmp(rightType, "int") == 0) {
                 return leftType;
             }
-            printf("Semantic Error: Pointer arithmetic allows only adding/subtracting an int\n");
+            SEMANTIC_ERROR("Semantic Error: Pointer arithmetic allows only adding/subtracting an int\n");
             return "unknown";
         }
 
         if ((strcmp(leftType, "int") != 0 && strcmp(leftType, "real") != 0) ||
             (strcmp(rightType, "int") != 0 && strcmp(rightType, "real") != 0)) {
-            printf("Semantic Error: Arithmetic operators require int or real operands\n");
+            SEMANTIC_ERROR("Semantic Error: Arithmetic operators require int or real operands\n");
             return "unknown";
         }
         
@@ -247,14 +250,14 @@ char* evaluateType(node* tree) {
 
     if (strcmp(tree->token, "&&") == 0 || strcmp(tree->token, "||") == 0) {
         if (strcmp(evaluateType(tree->left), "bool") != 0 || strcmp(evaluateType(tree->right), "bool") != 0) {
-            printf("Semantic Error: Logical operators && and || require bool operands\n");
+            SEMANTIC_ERROR("Semantic Error: Logical operators && and || require bool operands\n");
         }
         return "bool";
     }
     
     if (strcmp(tree->token, "!") == 0) {
         if (strcmp(evaluateType(tree->left), "bool") != 0) {
-            printf("Semantic Error: Operator ! requires a bool operand\n");
+            SEMANTIC_ERROR("Semantic Error: Operator ! requires a bool operand\n");
         }
         return "bool";
     }
@@ -265,7 +268,7 @@ char* evaluateType(node* tree) {
         char* rightType = evaluateType(tree->right);
         if ((strcmp(leftType, "int") != 0 && strcmp(leftType, "real") != 0) ||
             (strcmp(rightType, "int") != 0 && strcmp(rightType, "real") != 0)) {
-            printf("Semantic Error: Relational operators <, >, <=, >= require int or real operands\n");
+            SEMANTIC_ERROR("Semantic Error: Relational operators <, >, <=, >= require int or real operands\n");
         }
         return "bool";
     }
@@ -275,9 +278,9 @@ char* evaluateType(node* tree) {
         char* rightType = evaluateType(tree->right);
         
         if (strcmp(leftType, rightType) != 0) {
-             printf("Semantic Error: Operators == and != require operands of the exact same type\n");
+             SEMANTIC_ERROR("Semantic Error: Operators == and != require operands of the exact same type\n");
         } else if (strcmp(leftType, "STRING") == 0) {
-             printf("Semantic Error: Operators == and != cannot be used directly on strings\n");
+             SEMANTIC_ERROR("Semantic Error: Operators == and != cannot be used directly on strings\n");
         }
         return "bool";
     }
@@ -291,21 +294,21 @@ void analyzeAssignment(node* tree) {
 
     if (strcmp(rightType, "null") == 0) {
         if (!isPointerType(leftType)) {
-            printf("Semantic Error: NULL can only be assigned to a pointer\n");
+            SEMANTIC_ERROR("Semantic Error: NULL can only be assigned to a pointer\n");
         }
         return;
     }
 
     if (strcmp(tree->left->token, "INDEX") == 0 && strcmp(leftType, "char") == 0) {
         if (strcmp(rightType, "char") != 0) {
-            printf("Semantic Error: String cells can only be assigned characters\n");
+            SEMANTIC_ERROR("Semantic Error: String cells can only be assigned characters\n");
         }
         return;
     }
 
     if (strcmp(leftType, rightType) != 0) {
         if (!(strcmp(leftType, "real") == 0 && strcmp(rightType, "int") == 0)) {
-            printf("Semantic Error: Type mismatch in assignment\n");
+            SEMANTIC_ERROR("Semantic Error: Type mismatch in assignment\n");
         }
     }
 }
@@ -315,7 +318,7 @@ void analyzeCall(node* tree) {
     symbol* s = lookup_all(tree->left->token);
     
     if (!s || (strcmp(s->kind, "func") != 0 && strcmp(s->kind, "proc") != 0)) {
-        printf("Semantic Error: Undeclared function/procedure '%s'\n", tree->left->token);
+        SEMANTIC_ERROR("Semantic Error: Undeclared function/procedure '%s'\n", tree->left->token);
         return;
     }
 
@@ -327,7 +330,7 @@ void analyzeCall(node* tree) {
         if (arg_count < s->param_count) {
             if (strcmp(arg_type, s->param_types[arg_count]) != 0 && 
                 !(strcmp(s->param_types[arg_count], "real") == 0 && strcmp(arg_type, "int") == 0)) {
-                printf("Semantic Error: Argument %d type mismatch in call to '%s'\n", arg_count + 1, s->name);
+                SEMANTIC_ERROR("Semantic Error: Argument %d type mismatch in call to '%s'\n", arg_count + 1, s->name);
             }
         }
         arg_count++;
@@ -339,30 +342,30 @@ void analyzeCall(node* tree) {
         if (arg_count < s->param_count) {
             if (strcmp(arg_type, s->param_types[arg_count]) != 0 && 
                 !(strcmp(s->param_types[arg_count], "real") == 0 && strcmp(arg_type, "int") == 0)) {
-                printf("Semantic Error: Argument %d type mismatch in call to '%s'\n", arg_count + 1, s->name);
+                SEMANTIC_ERROR("Semantic Error: Argument %d type mismatch in call to '%s'\n", arg_count + 1, s->name);
             }
         }
         arg_count++;
     }
 
     if (arg_count != s->param_count) {
-        printf("Semantic Error: Incorrect number of arguments for '%s'\n", s->name);
+        SEMANTIC_ERROR("Semantic Error: Incorrect number of arguments for '%s'\n", s->name);
     }
 }
 
 void analyzeReturn(node* tree) {
     if (!current_func_return_type) {
-        printf("Semantic Error: Return statement outside of a function\n");
+        SEMANTIC_ERROR("Semantic Error: Return statement outside of a function\n");
         return;
     }
     
     char* ret_type = evaluateType(tree->left);
     
     if (strcmp(current_func_return_type, "STRING") == 0) {
-        printf("Semantic Error: Function cannot return a string\n");
+        SEMANTIC_ERROR("Semantic Error: Function cannot return a string\n");
     } else if (strcmp(current_func_return_type, ret_type) != 0) {
         if (!(strcmp(current_func_return_type, "real") == 0 && strcmp(ret_type, "int") == 0)) {
-            printf("Semantic Error: Return type mismatch\n");
+            SEMANTIC_ERROR("Semantic Error: Return type mismatch\n");
         }
     }
 }
@@ -370,9 +373,9 @@ void analyzeReturn(node* tree) {
 void checkMainValidity() {
     symbol* main_sym = lookup_all("Main");
     if (!main_sym || strcmp(main_sym->kind, "proc") != 0) {
-        printf("Semantic Error: Procedure 'Main' must exist and be unique.\n");
+        SEMANTIC_ERROR("Semantic Error: Procedure 'Main' must exist and be unique.\n");
     } else if (main_sym->param_count > 0) {
-        printf("Semantic Error: Procedure 'Main' cannot take arguments.\n");
+        SEMANTIC_ERROR("Semantic Error: Procedure 'Main' cannot take arguments.\n");
     }
 }
 
@@ -396,7 +399,7 @@ void analyzeAST(node* tree) {
         if (strcmp(tree->left->token, "Main") == 0) main_found = 1;
 
         if (lookup_current(tree->left->token) != NULL) {
-            printf("Semantic Error: Procedure '%s' already declared\n", tree->left->token);
+            SEMANTIC_ERROR("Semantic Error: Procedure '%s' already declared\n", tree->left->token);
         } else {
             symbol* s = insert_symbol(tree->left->token, "proc", "void");
             extractParams(tree->right->left, s);
@@ -414,11 +417,11 @@ void analyzeAST(node* tree) {
         char* return_type = ret_node->left->token;
         
         if (strcmp(return_type, "STRING") == 0) {
-            printf("Semantic Error: Function '%s' cannot have a string return type\n", tree->left->token);
+            SEMANTIC_ERROR("Semantic Error: Function '%s' cannot have a string return type\n", tree->left->token);
         }
 
         if (lookup_current(tree->left->token) != NULL) {
-            printf("Semantic Error: Function '%s' already declared\n", tree->left->token);
+            SEMANTIC_ERROR("Semantic Error: Function '%s' already declared\n", tree->left->token);
         } else {
             symbol* s = insert_symbol(tree->left->token, "func", return_type);
             extractParams(tree->right->left, s);
@@ -440,15 +443,15 @@ void analyzeAST(node* tree) {
         analyzeReturn(tree);
     } else if (strcmp(tree->token, "IF") == 0 || strcmp(tree->token, "IF-ELSE") == 0) {
         if (strcmp(evaluateType(tree->left), "bool") != 0) {
-            printf("Semantic Error: 'if' condition must be of type bool\n");
+            SEMANTIC_ERROR("Semantic Error: 'if' condition must be of type bool\n");
         }
     } else if (strcmp(tree->token, "WHILE") == 0) {
         if (strcmp(evaluateType(tree->left), "bool") != 0) {
-            printf("Semantic Error: 'while' condition must be of type bool\n");
+            SEMANTIC_ERROR("Semantic Error: 'while' condition must be of type bool\n");
         }
     } else if (strcmp(tree->token, "FOR") == 0) {
         if (strcmp(evaluateType(tree->right->left), "bool") != 0) {
-            printf("Semantic Error: 'for' condition must be of type bool\n");
+            SEMANTIC_ERROR("Semantic Error: 'for' condition must be of type bool\n");
         }
     }
 
@@ -458,7 +461,7 @@ void analyzeAST(node* tree) {
         strcmp(tree->token, "CALL") != 0 && strcmp(tree->token, "CODE") != 0 && strcmp(tree->token, "") != 0) {
         if (tree->left == NULL && tree->right == NULL) {
             if (lookup_all(tree->token) == NULL) {
-                printf("Semantic Error: Undeclared identifier '%s'\n", tree->token);
+                SEMANTIC_ERROR("Semantic Error: Undeclared identifier '%s'\n", tree->token);
             }
         }
     }

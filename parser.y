@@ -221,6 +221,14 @@ int main()
         enter_scope();
         analyzeAST(root);
         checkMainValidity();
+
+        if (semantic_error_found)
+        {
+            remove("output.txt");
+            printf("3AC was not generated due to semantic errors\n");
+            return 0;
+        }
+
         initIR("output.txt");
         generate3AC(root);
         closeIR();

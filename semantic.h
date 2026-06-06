@@ -26,6 +26,7 @@ typedef struct scope
 extern scope* current_scope;
 extern char* current_func_return_type;
 extern int main_found;
+extern int semantic_error_found;
 
 int isLiteral(char* token);
 int isTypeName(char* token);
