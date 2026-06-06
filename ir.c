@@ -22,7 +22,6 @@ static void generateStatement(node* tree);
 
 static char* generateExpression(node* tree);
 static char* generateLValue(node* tree);
-static void generateBooleanExpression(node* tree, const char* trueLabel, const char* falseLabel);
 static char* generateLogicalExpression(node* tree);
 static void generateAssignment(node* tree);
 static void generateReturn(node* tree);
@@ -101,11 +100,6 @@ static void emitIfGoto(const char* condition, const char* label)
 
     fprintf(ir_output, "if %s Goto %s\n", condition, label);
 }
-
-static void emitPushParam(const char* value);
-static void emitCallResult(const char* result, const char* name);
-static void emitCallOnly(const char* name);
-static void emitPopParams(int size);
 
 static int generateArguments(node* tree);
 static char* generateCall(node* tree);
@@ -621,44 +615,6 @@ static char* generateCall(node* tree)
     }
 
     return result;
-}
-
-static void generateBooleanExpression(node* tree, const char* trueLabel, const char* falseLabel)
-{
-    char* nextLabel;
-    char* conditionPlace;
-
-    if (tree == NULL)
-    {
-        return;
-    }
-
-    if (strcmp(tree->token, "&&") == 0)
-    {
-        nextLabel = newLabel();
-
-        generateBooleanExpression(tree->left, nextLabel, falseLabel);
-        emitLabel(nextLabel);
-        generateBooleanExpression(tree->right, trueLabel, falseLabel);
-
-        return;
-    }
-
-    if (strcmp(tree->token, "||") == 0)
-    {
-        nextLabel = newLabel();
-
-        generateBooleanExpression(tree->left, trueLabel, nextLabel);
-        emitLabel(nextLabel);
-        generateBooleanExpression(tree->right, trueLabel, falseLabel);
-
-        return;
-    }
-
-    conditionPlace = generateExpression(tree);
-
-    emitIfGoto(conditionPlace, trueLabel);
-    emitGoto(falseLabel);
 }
 
 static char* generateLogicalExpression(node* tree)
