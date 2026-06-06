@@ -30,6 +30,54 @@ static void emitBinary(const char* result, const char* left, const char* op, con
 static void emitUnary(const char* result, const char* op, const char* value);
 static void emitReturnValue(const char* value);
 
+static void emitPushParam(const char* value)
+{
+    if (ir_output == NULL || value == NULL)
+    {
+        return;
+    }
+
+    fprintf(ir_output, "PushParam %s\n", value);
+}
+
+static void emitCallResult(const char* result, const char* name)
+{
+    if (ir_output == NULL || result == NULL || name == NULL)
+    {
+        return;
+    }
+
+    fprintf(ir_output, "%s = LCall %s\n", result, name);
+}
+
+static void emitCallOnly(const char* name)
+{
+    if (ir_output == NULL || name == NULL)
+    {
+        return;
+    }
+
+    fprintf(ir_output, "LCall %s\n", name);
+}
+
+static void emitPopParams(int size)
+{
+    if (ir_output == NULL)
+    {
+        return;
+    }
+
+    fprintf(ir_output, "PopParams %d\n", size);
+}
+
+static void emitPushParam(const char* value);
+static void emitCallResult(const char* result, const char* name);
+static void emitCallOnly(const char* name);
+static void emitPopParams(int size);
+
+static int generateArguments(node* tree);
+static char* generateCall(node* tree);
+
 void initIR(const char* outputFileName)
 {
     ir_output = fopen(outputFileName, "w");
@@ -388,7 +436,11 @@ static void generateStatement(node* tree)
         generateReturn(tree);
         return;
     }
-
+    if (strcmp(tree->token, "CALL") == 0)
+    {
+        generateCall(tree);
+        return;
+    }
     if (strcmp(tree->token, "BODY") == 0)
     {
         generateBody(tree);
@@ -431,6 +483,10 @@ static char* generateExpression(node* tree)
 
         return result;
     }
+    if (strcmp(tree->token, "CALL") == 0)
+{
+    return generateCall(tree);
+}
 
     if (strcmp(tree->token, "!") == 0)
     {
@@ -464,6 +520,51 @@ static char* generateExpression(node* tree)
 
     /* calls indexes len later */
     return copyString(tree->token);
+}
+static int generateArguments(node* tree)
+{
+    char* argPlace;
+    int count;
+
+    if (tree == NULL)
+    {
+        return 0;
+    }
+
+    if (isEmptyNode(tree))
+    {
+        count = generateArguments(tree->left);
+        count += generateArguments(tree->right);
+        return count;
+    }
+
+    argPlace = generateExpression(tree);
+    emitPushParam(argPlace);
+
+    return 1;
+}
+
+static char* generateCall(node* tree)
+{
+    char* result;
+    int paramCount;
+
+    if (tree == NULL)
+    {
+        return copyString("");
+    }
+
+    paramCount = generateArguments(tree->right);
+
+    result = newTemp();
+
+    if (tree->left != NULL)
+    {
+        emitCallResult(result, tree->left->token);
+        emitPopParams(paramCount * 8);
+    }
+
+    return result;
 }
 
 static char* generateLValue(node* tree)
