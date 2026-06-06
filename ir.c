@@ -25,10 +25,16 @@ static char* generateLValue(node* tree);
 static void generateAssignment(node* tree);
 static void generateReturn(node* tree);
 
+static void generateIf(node* tree);
+static void generateIfElse(node* tree);
+
 static void emitAssign(const char* left, const char* right);
 static void emitBinary(const char* result, const char* left, const char* op, const char* right);
 static void emitUnary(const char* result, const char* op, const char* value);
 static void emitReturnValue(const char* value);
+
+static void emitGoto(const char* label);
+static void emitIfGoto(const char* condition, const char* label);
 
 static void emitPushParam(const char* value)
 {
@@ -68,6 +74,26 @@ static void emitPopParams(int size)
     }
 
     fprintf(ir_output, "PopParams %d\n", size);
+}
+
+static void emitGoto(const char* label)
+{
+    if (ir_output == NULL || label == NULL)
+    {
+        return;
+    }
+
+    fprintf(ir_output, "Goto %s\n", label);
+}
+
+static void emitIfGoto(const char* condition, const char* label)
+{
+    if (ir_output == NULL || condition == NULL || label == NULL)
+    {
+        return;
+    }
+
+    fprintf(ir_output, "if %s Goto %s\n", condition, label);
 }
 
 static void emitPushParam(const char* value);
@@ -441,13 +467,23 @@ static void generateStatement(node* tree)
         generateCall(tree);
         return;
     }
+    if (strcmp(tree->token, "IF") == 0)
+    {
+        generateIf(tree);
+        return;
+    }
+
+    if (strcmp(tree->token, "IF-ELSE") == 0)
+    {
+        generateIfElse(tree);
+        return;
+    }
     if (strcmp(tree->token, "BODY") == 0)
     {
         generateBody(tree);
         return;
     }
 
-    /* if while for calls later */
 }
 
 static char* generateExpression(node* tree)
@@ -518,7 +554,6 @@ static char* generateExpression(node* tree)
         return result;
     }
 
-    /* calls indexes len later */
     return copyString(tree->token);
 }
 static int generateArguments(node* tree)
@@ -638,4 +673,58 @@ static void generateReturn(node* tree)
     returnPlace = generateExpression(tree->left);
 
     emitReturnValue(returnPlace);
+}
+
+static void generateIf(node* tree)
+{
+    char* conditionPlace;
+    char* trueLabel;
+    char* endLabel;
+
+    if (tree == NULL)
+    {
+        return;
+    }
+
+    conditionPlace = generateExpression(tree->left);
+    trueLabel = newLabel();
+    endLabel = newLabel();
+
+    emitIfGoto(conditionPlace, trueLabel);
+    emitGoto(endLabel);
+
+    emitLabel(trueLabel);
+    generateStatement(tree->right);
+
+    emitLabel(endLabel);
+}
+
+static void generateIfElse(node* tree)
+{
+    char* conditionPlace;
+    char* trueLabel;
+    char* falseLabel;
+    char* endLabel;
+
+    if (tree == NULL)
+    {
+        return;
+    }
+
+    conditionPlace = generateExpression(tree->left);
+    trueLabel = newLabel();
+    falseLabel = newLabel();
+    endLabel = newLabel();
+
+    emitIfGoto(conditionPlace, trueLabel);
+    emitGoto(falseLabel);
+
+    emitLabel(trueLabel);
+    generateStatement(tree->right->left);
+    emitGoto(endLabel);
+
+    emitLabel(falseLabel);
+    generateStatement(tree->right->right);
+
+    emitLabel(endLabel);
 }
