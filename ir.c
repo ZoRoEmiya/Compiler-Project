@@ -22,6 +22,8 @@ static void generateStatement(node* tree);
 
 static char* generateExpression(node* tree);
 static char* generateLValue(node* tree);
+static void generateBooleanExpression(node* tree, const char* trueLabel, const char* falseLabel);
+static char* generateLogicalExpression(node* tree);
 static void generateAssignment(node* tree);
 static void generateReturn(node* tree);
 
@@ -511,6 +513,11 @@ static char* generateExpression(node* tree)
         return copyString("");
     }
 
+    if (strcmp(tree->token, "&&") == 0 || strcmp(tree->token, "||") == 0)
+    {
+        return generateLogicalExpression(tree);
+    }
+
     if (isLeaf(tree))
     {
         if (isLiteralToken(tree->token))
@@ -614,6 +621,129 @@ static char* generateCall(node* tree)
     }
 
     return result;
+}
+
+static void generateBooleanExpression(node* tree, const char* trueLabel, const char* falseLabel)
+{
+    char* nextLabel;
+    char* conditionPlace;
+
+    if (tree == NULL)
+    {
+        return;
+    }
+
+    if (strcmp(tree->token, "&&") == 0)
+    {
+        nextLabel = newLabel();
+
+        generateBooleanExpression(tree->left, nextLabel, falseLabel);
+        emitLabel(nextLabel);
+        generateBooleanExpression(tree->right, trueLabel, falseLabel);
+
+        return;
+    }
+
+    if (strcmp(tree->token, "||") == 0)
+    {
+        nextLabel = newLabel();
+
+        generateBooleanExpression(tree->left, trueLabel, nextLabel);
+        emitLabel(nextLabel);
+        generateBooleanExpression(tree->right, trueLabel, falseLabel);
+
+        return;
+    }
+
+    conditionPlace = generateExpression(tree);
+
+    emitIfGoto(conditionPlace, trueLabel);
+    emitGoto(falseLabel);
+}
+
+static char* generateLogicalExpression(node* tree)
+{
+    char* leftPlace;
+    char* rightPlace;
+    char* result;
+
+    char* firstLabel;
+    char* secondLabel;
+    char* thirdLabel;
+    char* endLabel;
+
+    if (tree == NULL)
+    {
+        return copyString("");
+    }
+
+    if (strcmp(tree->token, "&&") == 0)
+    {
+        firstLabel = newLabel();
+        secondLabel = newLabel();
+        thirdLabel = newLabel();
+        endLabel = newLabel();
+
+        leftPlace = generateExpression(tree->left);
+
+        emitIfGoto(leftPlace, firstLabel);
+        emitGoto(secondLabel);
+
+        emitLabel(firstLabel);
+
+        rightPlace = generateExpression(tree->right);
+
+        emitIfGoto(rightPlace, thirdLabel);
+        emitGoto(secondLabel);
+
+        result = newTemp();
+
+        emitLabel(secondLabel);
+        emitAssign(result, "false");
+        emitGoto(endLabel);
+
+        emitLabel(thirdLabel);
+        emitAssign(result, "true");
+
+        emitLabel(endLabel);
+
+        return result;
+    }
+
+    if (strcmp(tree->token, "||") == 0)
+    {
+        firstLabel = newLabel();
+        secondLabel = newLabel();
+        thirdLabel = newLabel();
+        endLabel = newLabel();
+
+        leftPlace = generateExpression(tree->left);
+
+        emitIfGoto(leftPlace, thirdLabel);
+        emitGoto(firstLabel);
+
+        emitLabel(firstLabel);
+
+        rightPlace = generateExpression(tree->right);
+
+        emitIfGoto(rightPlace, thirdLabel);
+        emitGoto(secondLabel);
+
+        result = newTemp();
+
+        emitLabel(secondLabel);
+        emitAssign(result, "false");
+        emitGoto(endLabel);
+
+        emitLabel(thirdLabel);
+        emitAssign(result, "true");
+
+        emitLabel(endLabel);
+
+        return result;
+    }
+
+    return generateExpression(tree);
 }
 
 static char* generateLValue(node* tree)
@@ -742,6 +872,7 @@ static void generateIfElse(node* tree)
 
     emitLabel(endLabel);
 }
+
 static void generateWhile(node* tree)
 {
     char* startLabel;
