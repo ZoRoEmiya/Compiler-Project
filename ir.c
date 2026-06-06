@@ -7,11 +7,28 @@ static FILE* ir_output = NULL;
 static int temp_counter = 0;
 static int label_counter = 1;
 
+static char* copyString(const char* str);
 static int isEmptyNode(node* tree);
+static int isLeaf(node* tree);
+static int isLiteralToken(const char* token);
+static int isBinaryOperator(const char* token);
+
 static void generateNode(node* tree);
 static void generateFunction(node* tree);
 static void generateProcedure(node* tree);
 static void generateBody(node* tree);
+static void generateStatementList(node* tree);
+static void generateStatement(node* tree);
+
+static char* generateExpression(node* tree);
+static char* generateLValue(node* tree);
+static void generateAssignment(node* tree);
+static void generateReturn(node* tree);
+
+static void emitAssign(const char* left, const char* right);
+static void emitBinary(const char* result, const char* left, const char* op, const char* right);
+static void emitUnary(const char* result, const char* op, const char* value);
+static void emitReturnValue(const char* value);
 
 void initIR(const char* outputFileName)
 {
@@ -114,6 +131,46 @@ void emitEndFunc()
     fprintf(ir_output, "EndFunc\n");
 }
 
+static void emitAssign(const char* left, const char* right)
+{
+    if (ir_output == NULL || left == NULL || right == NULL)
+    {
+        return;
+    }
+
+    fprintf(ir_output, "%s = %s\n", left, right);
+}
+
+static void emitBinary(const char* result, const char* left, const char* op, const char* right)
+{
+    if (ir_output == NULL || result == NULL || left == NULL || op == NULL || right == NULL)
+    {
+        return;
+    }
+
+    fprintf(ir_output, "%s = %s %s %s\n", result, left, op, right);
+}
+
+static void emitUnary(const char* result, const char* op, const char* value)
+{
+    if (ir_output == NULL || result == NULL || op == NULL || value == NULL)
+    {
+        return;
+    }
+
+    fprintf(ir_output, "%s = %s%s\n", result, op, value);
+}
+
+static void emitReturnValue(const char* value)
+{
+    if (ir_output == NULL || value == NULL)
+    {
+        return;
+    }
+
+    fprintf(ir_output, "Return %s\n", value);
+}
+
 void generate3AC(node* root)
 {
     if (root == NULL)
@@ -124,9 +181,73 @@ void generate3AC(node* root)
     generateNode(root);
 }
 
+static char* copyString(const char* str)
+{
+    char* result;
+
+    if (str == NULL)
+    {
+        return NULL;
+    }
+
+    result = (char*)malloc(strlen(str) + 1);
+    strcpy(result, str);
+
+    return result;
+}
+
 static int isEmptyNode(node* tree)
 {
     return tree != NULL && strcmp(tree->token, "") == 0;
+}
+
+static int isLeaf(node* tree)
+{
+    return tree != NULL && tree->left == NULL && tree->right == NULL;
+}
+
+static int isLiteralToken(const char* token)
+{
+    if (token == NULL)
+    {
+        return 0;
+    }
+
+    if (strcmp(token, "true") == 0 || strcmp(token, "false") == 0 || strcmp(token, "null") == 0)
+    {
+        return 1;
+    }
+
+    if (token[0] >= '0' && token[0] <= '9')
+    {
+        return 1;
+    }
+
+    if (token[0] == '\'' || token[0] == '"')
+    {
+        return 1;
+    }
+
+    return 0;
+}
+
+static int isBinaryOperator(const char* token)
+{
+    if (token == NULL)
+    {
+        return 0;
+    }
+
+    return strcmp(token, "+") == 0 ||
+           strcmp(token, "-") == 0 ||
+           strcmp(token, "*") == 0 ||
+           strcmp(token, "/") == 0 ||
+           strcmp(token, "==") == 0 ||
+           strcmp(token, "!=") == 0 ||
+           strcmp(token, ">") == 0 ||
+           strcmp(token, ">=") == 0 ||
+           strcmp(token, "<") == 0 ||
+           strcmp(token, "<=") == 0;
 }
 
 static void generateNode(node* tree)
@@ -226,5 +347,194 @@ static void generateBody(node* tree)
         return;
     }
 
-    /* statements here */
+    if (tree->right != NULL)
+    {
+        generateStatementList(tree->right->right);
+    }
+}
+
+static void generateStatementList(node* tree)
+{
+    if (tree == NULL)
+    {
+        return;
+    }
+
+    if (isEmptyNode(tree))
+    {
+        generateStatementList(tree->left);
+        generateStatementList(tree->right);
+        return;
+    }
+
+    generateStatement(tree);
+}
+
+static void generateStatement(node* tree)
+{
+    if (tree == NULL)
+    {
+        return;
+    }
+
+    if (strcmp(tree->token, "=") == 0)
+    {
+        generateAssignment(tree);
+        return;
+    }
+
+    if (strcmp(tree->token, "RET") == 0)
+    {
+        generateReturn(tree);
+        return;
+    }
+
+    if (strcmp(tree->token, "BODY") == 0)
+    {
+        generateBody(tree);
+        return;
+    }
+
+    /* if while for calls later */
+}
+
+static char* generateExpression(node* tree)
+{
+    char* leftPlace;
+    char* rightPlace;
+    char* result;
+
+    if (tree == NULL)
+    {
+        return copyString("");
+    }
+
+    if (isLeaf(tree))
+    {
+        if (isLiteralToken(tree->token))
+        {
+            result = newTemp();
+            emitAssign(result, tree->token);
+            return result;
+        }
+
+        return copyString(tree->token);
+    }
+
+    if (isBinaryOperator(tree->token))
+    {
+        leftPlace = generateExpression(tree->left);
+        rightPlace = generateExpression(tree->right);
+
+        result = newTemp();
+        emitBinary(result, leftPlace, tree->token, rightPlace);
+
+        return result;
+    }
+
+    if (strcmp(tree->token, "!") == 0)
+    {
+        leftPlace = generateExpression(tree->left);
+
+        result = newTemp();
+        emitUnary(result, "!", leftPlace);
+
+        return result;
+    }
+
+    if (strcmp(tree->token, "^") == 0)
+    {
+        leftPlace = generateExpression(tree->left);
+
+        result = newTemp();
+        emitUnary(result, "*", leftPlace);
+
+        return result;
+    }
+
+    if (strcmp(tree->token, "&") == 0)
+    {
+        leftPlace = generateExpression(tree->left);
+
+        result = newTemp();
+        emitUnary(result, "&", leftPlace);
+
+        return result;
+    }
+
+    /* calls indexes len later */
+    return copyString(tree->token);
+}
+
+static char* generateLValue(node* tree)
+{
+    char* base;
+    char* indexPlace;
+    char* result;
+
+    if (tree == NULL)
+    {
+        return copyString("");
+    }
+
+    if (isLeaf(tree))
+    {
+        return copyString(tree->token);
+    }
+
+    if (strcmp(tree->token, "^") == 0)
+    {
+        base = generateExpression(tree->left);
+
+        result = (char*)malloc(strlen(base) + 2);
+        strcpy(result, "*");
+        strcat(result, base);
+
+        return result;
+    }
+
+    if (strcmp(tree->token, "INDEX") == 0)
+    {
+        indexPlace = generateExpression(tree->right);
+
+        result = (char*)malloc(strlen(tree->left->token) + strlen(indexPlace) + 4);
+        strcpy(result, tree->left->token);
+        strcat(result, "[");
+        strcat(result, indexPlace);
+        strcat(result, "]");
+
+        return result;
+    }
+
+    return generateExpression(tree);
+}
+
+static void generateAssignment(node* tree)
+{
+    char* leftPlace;
+    char* rightPlace;
+
+    if (tree == NULL)
+    {
+        return;
+    }
+
+    leftPlace = generateLValue(tree->left);
+    rightPlace = generateExpression(tree->right);
+
+    emitAssign(leftPlace, rightPlace);
+}
+
+static void generateReturn(node* tree)
+{
+    char* returnPlace;
+
+    if (tree == NULL)
+    {
+        return;
+    }
+
+    returnPlace = generateExpression(tree->left);
+
+    emitReturnValue(returnPlace);
 }
