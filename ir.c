@@ -21,23 +21,23 @@ static void generateStatementList(node* tree);
 static void generateStatement(node* tree);
 
 static char* generateExpression(node* tree);
-static char* generateLValue(node* tree);
 static char* generateLogicalExpression(node* tree);
+static char* generateLValue(node* tree);
 static void generateAssignment(node* tree);
 static void generateReturn(node* tree);
+static int generateArguments(node* tree);
+static char* generateCall(node* tree);
+
 
 static void generateIf(node* tree);
 static void generateIfElse(node* tree);
-
 static void generateWhile(node* tree);
-
 static void generateFor(node* tree);
 
 static void emitAssign(const char* left, const char* right);
 static void emitBinary(const char* result, const char* left, const char* op, const char* right);
 static void emitUnary(const char* result, const char* op, const char* value);
 static void emitReturnValue(const char* value);
-
 static void emitGoto(const char* label);
 static void emitIfGoto(const char* condition, const char* label);
 
@@ -59,16 +59,6 @@ static void emitCallResult(const char* result, const char* name)
     }
 
     fprintf(ir_output, "%s = LCall %s\n", result, name);
-}
-
-static void emitCallOnly(const char* name)
-{
-    if (ir_output == NULL || name == NULL)
-    {
-        return;
-    }
-
-    fprintf(ir_output, "LCall %s\n", name);
 }
 
 static void emitPopParams(int size)
@@ -100,9 +90,6 @@ static void emitIfGoto(const char* condition, const char* label)
 
     fprintf(ir_output, "if %s Goto %s\n", condition, label);
 }
-
-static int generateArguments(node* tree);
-static char* generateCall(node* tree);
 
 void initIR(const char* outputFileName)
 {
